@@ -3,9 +3,13 @@ import cors from "cors";
 import dotenv from "dotenv";
 import docRoutes from "./routes/documentRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
+import connectDB from "./config/db.js";
 
 dotenv.config();
 const app = express();
+
+// MongoDB Connection
+connectDB();
 
 // Updated CORS to allow all Vercel previews and your main domain
 app.use(
