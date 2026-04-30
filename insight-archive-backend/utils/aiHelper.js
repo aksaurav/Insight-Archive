@@ -27,11 +27,10 @@ const validateEnv = () => {
 const getEmbeddings = () => {
   return new GoogleGenerativeAIEmbeddings({
     apiKey: process.env.GOOGLE_API_KEY,
-    // Try using 'models/text-embedding-004' (with the prefix)
-    // and provide both common property names for compatibility
-    modelName: "models/text-embedding-004",
-    model: "models/text-embedding-004",
-    taskType: TaskType.RETRIEVAL_DOCUMENT,
+    // Note: Do NOT use the "models/" prefix here.
+    // The library adds it automatically behind the scenes.
+    modelName: "text-embedding-004",
+    taskType: "RETRIEVAL_DOCUMENT",
   });
 };
 const getPineconeIndex = () => {
