@@ -2,23 +2,21 @@ import mongoose from "mongoose";
 
 const connectDB = async () => {
   try {
-    // Ensure the variable name matches your Render Environment Variables exactly
-    const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+    // Force the use of MONGO_URI to match your manual check
+    const uri = process.env.MONGO_URI;
 
     if (!uri) {
-      throw new Error(
-        "MongoDB connection string is missing in environment variables.",
-      );
+      console.error("❌ MONGO_URI is undefined in Render environment!");
+      return;
     }
 
     const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 5000, // Fail fast (5s) instead of waiting 30s
+      serverSelectionTimeoutMS: 5000,
     });
 
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    // This will force Render to restart the service if the DB is down
+    console.error(`❌ Connection Error: ${error.message}`);
     process.exit(1);
   }
 };
