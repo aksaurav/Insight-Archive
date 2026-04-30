@@ -4,7 +4,7 @@ import {
   askQuestion,
   deleteDoc,
   fetchDocuments,
-  fetchChatHistory, // Ensure this is added to your api.js
+  fetchChatHistory,
 } from "./services/api";
 import {
   Upload,
