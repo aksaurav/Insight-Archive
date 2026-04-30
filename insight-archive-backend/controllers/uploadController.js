@@ -10,83 +10,107 @@ export const uploadDocument = async (req, res) => {
   let createdDocId = null;
 
   try {
-    // 1. Basic Validation
+    // ==========================
+    // 1. VALIDATION
+    // ==========================
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
     if (req.file.mimetype !== "application/pdf") {
-      return res.status(400).json({ message: "Only PDF files are supported" });
+      return res.status(400).json({
+        message: "Only PDF files are supported",
+      });
     }
 
-    console.log(`Processing file: ${req.file.originalname}`);
+    console.log(`📄 Processing file: ${req.file.originalname}`);
 
-    // 2. Extract Text from PDF Buffer
-    // FIX: Some environments require accessing .default when using ESM with this library
-    const pdfParser = pdf.default || pdf;
+    // ==========================
+    // 2. PDF PARSING
+    // ==========================
+    const pdfParser = pdf?.default || pdf;
 
     let data;
     try {
       data = await pdfParser(req.file.buffer);
     } catch (parseError) {
-      console.error("PDF Parsing Error:", parseError);
-      return res.status(422).json({ message: "Could not read PDF content." });
+      console.error("❌ PDF Parsing Error:", parseError);
+      return res.status(422).json({
+        message: "Could not read PDF content.",
+      });
     }
 
     const extractedText = data?.text;
 
-    if (!extractedText || extractedText.trim().length < 10) {
+    // ==========================
+    // 3. TEXT VALIDATION
+    // ==========================
+    if (!extractedText || extractedText.trim().length < 20) {
       return res.status(400).json({
-        message: "PDF seems to be empty or image-based (OCR required).",
+        message:
+          "PDF appears empty or image-based. OCR is required for scanned files.",
       });
     }
 
-    // 3. Generate Unique Namespace for Vector Isolation
-    // Clean filename to prevent Pinecone metadata issues
+    console.log(`📝 Extracted text length: ${extractedText.length} characters`);
+
+    // ==========================
+    // 4. NAMESPACE GENERATION
+    // ==========================
     const safeName = req.file.originalname
       .replace(/[^a-z0-9]/gi, "_")
-      .toLowerCase();
+      .toLowerCase()
+      .slice(0, 50); // prevent overly long namespace
+
     const namespace = `${Date.now()}-${safeName}`;
 
-    // 4. Save Metadata to MongoDB
-    // Placeholder User ID remains until Auth is added
+    // ==========================
+    // 5. SAVE METADATA (MongoDB)
+    // ==========================
     const newDoc = await Document.create({
-      user: "65f1a2b3c4d5e6f7a8b9c0d1",
+      user: "65f1a2b3c4d5e6f7a8b9c0d1", // TODO: replace with auth later
       fileName: req.file.originalname,
       pineconeNamespace: namespace,
     });
 
     createdDocId = newDoc._id;
 
-    // 5. Trigger RAG Pipeline: Chunking + Embedding + Pinecone Upload
-    console.log(`Starting Gemini indexing for namespace: ${namespace}`);
+    console.log(`🗂 MongoDB record created: ${createdDocId}`);
+    console.log(`🚀 Starting AI indexing (namespace: ${namespace})`);
 
-    // Pass extracted text and the namespace to our helper
+    // ==========================
+    // 6. AI PIPELINE (CRITICAL)
+    // ==========================
     await embedAndStore(extractedText, namespace);
 
-    // 6. Final Response
+    console.log("✅ AI indexing completed");
+
+    // ==========================
+    // 7. RESPONSE
+    // ==========================
     res.status(201).json({
       message: "File processed and AI-indexed successfully!",
       document: newDoc,
       preview: extractedText.substring(0, 150).replace(/\n/g, " ") + "...",
     });
   } catch (error) {
-    // The "Detailed Error" log is your best friend on Render
-    console.error("CRITICAL UPLOAD ERROR:", error);
+    console.error("🔥 CRITICAL UPLOAD ERROR:", error);
 
-    // ROLLBACK: If MongoDB saved but AI indexing failed, delete the record
+    // ==========================
+    // ROLLBACK
+    // ==========================
     if (createdDocId) {
       try {
         await Document.findByIdAndDelete(createdDocId);
-        console.log("Rollback: Deleted MongoDB record due to AI failure.");
+        console.log("↩️ Rollback: MongoDB record deleted");
       } catch (dbError) {
-        console.error("Rollback failed:", dbError);
+        console.error("❌ Rollback failed:", dbError);
       }
     }
 
     res.status(500).json({
       message: "Server processing failed.",
-      error: error.message, // This helps you see the actual crash reason in the network tab
+      error: error.message,
     });
   }
 };
@@ -97,38 +121,47 @@ export const uploadDocument = async (req, res) => {
 export const deleteDocument = async (req, res) => {
   try {
     const { id } = req.params;
+
     const document = await Document.findById(id);
 
     if (!document) {
-      return res.status(404).json({ message: "Document not found" });
+      return res.status(404).json({
+        message: "Document not found",
+      });
     }
 
-    console.log(
-      `Deleting document and namespace: ${document.pineconeNamespace}`,
-    );
+    console.log(`🗑 Deleting namespace: ${document.pineconeNamespace}`);
 
-    // Delete from Pinecone
     await deleteNamespace(document.pineconeNamespace);
-
-    // Delete from Mongo
     await Document.findByIdAndDelete(id);
 
-    res.status(200).json({ message: "Deleted successfully" });
+    res.status(200).json({
+      message: "Deleted successfully",
+    });
   } catch (error) {
-    console.error("DETAILED DELETE ERROR:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ DELETE ERROR:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
 /**
- * Fetches all documents for the user.
+ * Fetches all documents
  */
 export const getAllDocuments = async (req, res) => {
   try {
-    const documents = await Document.find().sort({ createdAt: -1 });
+    const documents = await Document.find().sort({
+      createdAt: -1,
+    });
+
     res.status(200).json(documents);
   } catch (error) {
-    console.error("Fetch Docs Error:", error);
-    res.status(500).json({ message: "Failed to fetch documents" });
+    console.error("❌ FETCH DOCS ERROR:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch documents",
+    });
   }
 };
