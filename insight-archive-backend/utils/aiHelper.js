@@ -3,6 +3,7 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 import { PineconeStore } from "@langchain/pinecone";
 import { Pinecone } from "@pinecone-database/pinecone";
 import { ChatOpenRouter } from "@langchain/openrouter";
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 
 const getPineconeIndex = () => {
   const pc = new Pinecone({
@@ -14,33 +15,41 @@ const getPineconeIndex = () => {
 const getEmbeddingsConfig = () => {
   return new GoogleGenerativeAIEmbeddings({
     apiKey: process.env.GOOGLE_API_KEY,
+    // Using the 004 model is more stable for 768-dimension indexes
     modelName: "text-embedding-004",
-    maxRetries: 2,
   });
 };
 export const embedAndStore = async (text, namespace) => {
   try {
-    const index = getPineconeIndex();
+    const pc = new Pinecone({
+      apiKey: process.env.PINECONE_API_KEY,
+    });
+
+    const index = pc.index(process.env.PINECONE_INDEX_NAME);
     const embeddings = getEmbeddingsConfig();
 
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
       chunkOverlap: 200,
     });
+
     const docs = await splitter.createDocuments([text]);
 
+    // This is line 40 - ensure the parameters are exactly in this order
     await PineconeStore.fromDocuments(docs, embeddings, {
       pineconeIndex: index,
       namespace: namespace,
+      textKey: "text", // Explicitly define the text key
     });
 
+    console.log(`Successfully indexed to namespace: ${namespace}`);
     return true;
   } catch (error) {
-    console.error("Gemini Embed Error:", error);
-    throw new Error("Failed to index document in vector database.");
+    // This will now print the actual underlying cause in your Render logs
+    console.error("DETAILED AI HELPER ERROR:", error);
+    throw error; // Throwing the original error gives better debug info
   }
 };
-
 export const queryDocument = async (question, namespace) => {
   try {
     const index = getPineconeIndex();
