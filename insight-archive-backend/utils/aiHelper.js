@@ -5,6 +5,7 @@ import {
   GoogleGenerativeAIEmbeddings,
   ChatGoogleGenerativeAI,
 } from "@langchain/google-genai";
+import { TaskType } from "@google/generative-ai";
 
 // Helper for consistent embedding configuration
 const getEmbeddingsConfig = () => {
@@ -24,14 +25,25 @@ const getPineconeIndex = () => {
 export const embedAndStore = async (text, namespace) => {
   try {
     const index = getPineconeIndex();
-    const embeddings = getEmbeddingsConfig();
+
+    // Explicitly configure for the 768-dimension model
+    const embeddings = new GoogleGenerativeAIEmbeddings({
+      apiKey: process.env.GOOGLE_API_KEY,
+      modelName: "text-embedding-004",
+      taskType: TaskType.RETRIEVAL_DOCUMENT, // Optimization for RAG
+    });
 
     const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 500, // Safe for Render Free Tier RAM
+      chunkSize: 500,
       chunkOverlap: 50,
     });
 
     const docs = await splitter.createDocuments([text]);
+
+    // Added verification: Log the number of documents being sent
+    console.log(
+      `Sending ${docs.length} chunks to Pinecone for namespace: ${namespace}`,
+    );
 
     await PineconeStore.fromDocuments(docs, embeddings, {
       pineconeIndex: index,
