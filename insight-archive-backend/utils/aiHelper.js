@@ -26,11 +26,15 @@ export const embedAndStore = async (text, namespace) => {
   try {
     const index = getPineconeIndex();
 
-    // Explicitly configure for the 768-dimension model
+    // 1. Ensure text exists before processing
+    if (!text || text.trim().length === 0) {
+      throw new Error("No text content found in the document to index.");
+    }
+
     const embeddings = new GoogleGenerativeAIEmbeddings({
       apiKey: process.env.GOOGLE_API_KEY,
-      modelName: "text-embedding-004",
-      taskType: TaskType.RETRIEVAL_DOCUMENT, // Optimization for RAG
+      modelName: "text-embedding-004", // This model produces 768 dimensions
+      taskType: TaskType.RETRIEVAL_DOCUMENT,
     });
 
     const splitter = new RecursiveCharacterTextSplitter({
@@ -40,11 +44,16 @@ export const embedAndStore = async (text, namespace) => {
 
     const docs = await splitter.createDocuments([text]);
 
-    // Added verification: Log the number of documents being sent
+    // 2. Critical Check: If splitter failed or returned 0 docs, stop here
+    if (docs.length === 0) {
+      throw new Error("Text splitting resulted in zero documents.");
+    }
+
     console.log(
-      `Sending ${docs.length} chunks to Pinecone for namespace: ${namespace}`,
+      `📡 Sending ${docs.length} chunks to Pinecone (Namespace: ${namespace})`,
     );
 
+    // 3. Store in Pinecone
     await PineconeStore.fromDocuments(docs, embeddings, {
       pineconeIndex: index,
       namespace: namespace,
