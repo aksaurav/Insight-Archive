@@ -2,21 +2,21 @@ import mongoose from "mongoose";
 
 const connectDB = async () => {
   try {
-    // Force the use of MONGO_URI to match your manual check
-    const uri = process.env.MONGO_URI;
+    // This checks for the exact key in your screenshot (MONGO_URI)
+    // or the common one (MONGODB_URI)
+    const uri = process.env.MONGO_URI || process.env.MONGODB_URI;
 
     if (!uri) {
-      console.error("❌ MONGO_URI is undefined in Render environment!");
+      console.error(
+        "❌ DATABASE ERROR: No URI found in Environment Variables.",
+      );
       return;
     }
 
-    const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 5000,
-    });
-
+    const conn = await mongoose.connect(uri);
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error(`❌ Connection Error: ${error.message}`);
+    console.error(`❌ Connection Failed: ${error.message}`);
     process.exit(1);
   }
 };
