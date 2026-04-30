@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import docRoutes from "./routes/docRoutes.js";
+import docRoutes from "./routes/documentRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 
 dotenv.config();
