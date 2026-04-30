@@ -27,12 +27,10 @@ const validateEnv = () => {
 const getEmbeddings = () => {
   return new GoogleGenerativeAIEmbeddings({
     apiKey: process.env.GOOGLE_API_KEY,
-    // Fix: Updated from 'embedding-001' to 'text-embedding-004' (768 dimensions)
-    model: "text-embedding-004",
-    taskType: TaskType.RETRIEVAL_DOCUMENT,
+    modelName: "text-embedding-004", // No 'models/' prefix
+    taskType: "retrieval_document", // Lowercase string is sometimes more stable
   });
 };
-
 const getPineconeIndex = () => {
   const pc = new Pinecone({
     apiKey: process.env.PINECONE_API_KEY,
