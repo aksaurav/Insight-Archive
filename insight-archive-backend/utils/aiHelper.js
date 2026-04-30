@@ -6,7 +6,9 @@ import {
   ChatGoogleGenerativeAI,
 } from "@langchain/google-genai";
 
-// ✅ Validate ENV early (fail fast)
+// ==========================
+// ✅ ENV VALIDATION
+// ==========================
 if (!process.env.GOOGLE_API_KEY) {
   throw new Error("❌ GOOGLE_API_KEY is missing");
 }
@@ -17,11 +19,13 @@ if (!process.env.PINECONE_INDEX_NAME) {
   throw new Error("❌ PINECONE_INDEX_NAME is missing");
 }
 
-// ✅ Single source of truth for embeddings
+// ==========================
+// ✅ EMBEDDINGS CONFIG (FIXED)
+// ==========================
 const getEmbeddings = () => {
   return new GoogleGenerativeAIEmbeddings({
     apiKey: process.env.GOOGLE_API_KEY,
-    modelName: "text-embedding-004", // 768 dimensions
+    modelName: "embedding-001", // ✅ WORKING MODEL
   });
 };
 
@@ -40,23 +44,24 @@ export const embedAndStore = async (text, namespace) => {
     const index = getPineconeIndex();
     const embeddings = getEmbeddings();
 
-    // ✅ Validate input
     if (!text || text.trim().length === 0) {
       throw new Error("No text content found in the document.");
     }
 
-    // ✅ CRITICAL: Verify embeddings actually work
+    // 🔥 TEST EMBEDDING (dynamic dimension detection)
     const testEmbedding = await embeddings.embedQuery("health check");
 
-    console.log("🧪 Test embedding length:", testEmbedding?.length);
-
-    if (!testEmbedding || testEmbedding.length !== 768) {
-      throw new Error(
-        `Embedding failed. Expected 768, got ${testEmbedding?.length}`,
-      );
+    if (!testEmbedding || testEmbedding.length === 0) {
+      throw new Error("Embedding failed (empty vector)");
     }
 
-    // ✅ Split text
+    const dimension = testEmbedding.length;
+
+    console.log("🧪 Embedding dimension detected:", dimension);
+
+    // ==========================
+    // TEXT SPLITTING
+    // ==========================
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: 500,
       chunkOverlap: 50,
@@ -72,7 +77,9 @@ export const embedAndStore = async (text, namespace) => {
       `📡 Sending ${docs.length} chunks to Pinecone (namespace: ${namespace})`,
     );
 
-    // ✅ Store vectors
+    // ==========================
+    // STORE IN PINECONE
+    // ==========================
     await PineconeStore.fromDocuments(docs, embeddings, {
       pineconeIndex: index,
       namespace,
