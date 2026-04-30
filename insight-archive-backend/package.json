@@ -14,6 +14,7 @@
   "license": "ISC",
   "dependencies": {
     "@langchain/core": "^1.1.42",
+    "@langchain/google-genai": "^2.1.29",
     "@langchain/openai": "^1.4.5",
     "@langchain/openrouter": "^0.2.3",
     "@langchain/pinecone": "^1.0.2",

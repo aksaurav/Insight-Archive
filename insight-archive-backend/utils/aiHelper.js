@@ -12,19 +12,9 @@ const getPineconeIndex = () => {
 };
 
 const getEmbeddingsConfig = () => {
-  return new OpenAIEmbeddings({
-    // Using OpenRouter key here
-    openAIApiKey: process.env.OPENROUTER_API_KEY,
-    // This MUST match your Pinecone dimensions (1536)
-    modelName: "openai/text-embedding-3-small",
-    configuration: {
-      baseURL: "https://openrouter.ai/api/v1",
-      // Specifically for OpenRouter headers
-      defaultHeaders: {
-        "HTTP-Referer": "https://insight-archive.onrender.com",
-        "X-Title": "Insight Archive",
-      },
-    },
+  return new GoogleGenerativeAIEmbeddings({
+    apiKey: process.env.GOOGLE_API_KEY,
+    modelName: "embedding-001", // This outputs 768 dimensions
   });
 };
 
@@ -39,24 +29,14 @@ export const embedAndStore = async (text, namespace) => {
     });
     const docs = await splitter.createDocuments([text]);
 
-    console.log(
-      `Vectorizing ${docs.length} chunks for namespace: ${namespace}`,
-    );
-
-    // Using PineconeStore's static method
     await PineconeStore.fromDocuments(docs, embeddings, {
       pineconeIndex: index,
       namespace: namespace,
-      textKey: "text", // Explicitly define the text key
     });
 
     return true;
   } catch (error) {
-    // Log the actual error response from OpenRouter/Pinecone
-    console.error(
-      "DETAILED EMBED ERROR:",
-      error.response?.data || error.message,
-    );
+    console.error("Gemini Embed Error:", error);
     throw new Error("Failed to index document in vector database.");
   }
 };
@@ -74,9 +54,10 @@ export const queryDocument = async (question, namespace) => {
     const results = await vectorStore.similaritySearch(question, 4);
     const context = results.map((r) => r.pageContent).join("\n\n");
 
-    const model = new ChatOpenRouter({
-      model: "openai/gpt-4o-mini",
-      apiKey: process.env.OPENROUTER_API_KEY,
+    // Using Gemini 1.5 Flash (very fast and free)
+    const model = new ChatGoogleGenerativeAI({
+      modelName: "gemini-1.5-flash",
+      apiKey: process.env.GOOGLE_API_KEY,
     });
 
     const prompt = `Use the following context to answer the user's question. 
@@ -91,10 +72,7 @@ ${question}`;
     const response = await model.invoke(prompt);
     return response.content;
   } catch (error) {
-    console.error(
-      "Detailed Query Error:",
-      error.response?.data || error.message,
-    );
+    console.error("Gemini Query Error:", error);
     throw new Error("AI failed to process the question.");
   }
 };
