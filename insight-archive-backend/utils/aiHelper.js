@@ -12,42 +12,34 @@ const getPineconeIndex = () => {
   return pc.index(process.env.PINECONE_INDEX_NAME);
 };
 
-const getEmbeddingsConfig = () => {
-  return new GoogleGenerativeAIEmbeddings({
-    apiKey: process.env.GOOGLE_API_KEY,
-    // Using the 004 model is more stable for 768-dimension indexes
-    modelName: "text-embedding-004",
-  });
-};
 export const embedAndStore = async (text, namespace) => {
   try {
-    const pc = new Pinecone({
-      apiKey: process.env.PINECONE_API_KEY,
+    const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+    const index = pc.index(process.env.PINECONE_INDEX_NAME);
+
+    const embeddings = new GoogleGenerativeAIEmbeddings({
+      apiKey: process.env.GOOGLE_API_KEY,
+      modelName: "text-embedding-004",
     });
 
-    const index = pc.index(process.env.PINECONE_INDEX_NAME);
-    const embeddings = getEmbeddingsConfig();
-
     const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
-      chunkOverlap: 200,
+      chunkSize: 500, // Reduced from 1000 to save memory on Render
+      chunkOverlap: 50,
     });
 
     const docs = await splitter.createDocuments([text]);
 
-    // This is line 40 - ensure the parameters are exactly in this order
+    // Added a more direct initialization to prevent the 502 timeout
     await PineconeStore.fromDocuments(docs, embeddings, {
       pineconeIndex: index,
       namespace: namespace,
-      textKey: "text", // Explicitly define the text key
+      textKey: "text",
     });
 
-    console.log(`Successfully indexed to namespace: ${namespace}`);
     return true;
   } catch (error) {
-    // This will now print the actual underlying cause in your Render logs
-    console.error("DETAILED AI HELPER ERROR:", error);
-    throw error; // Throwing the original error gives better debug info
+    console.error("AI HELPER FAILURE:", error.message);
+    throw new Error(`Vector indexing failed: ${error.message}`);
   }
 };
 export const queryDocument = async (question, namespace) => {
