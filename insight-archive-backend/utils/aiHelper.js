@@ -14,10 +14,10 @@ const getPineconeIndex = () => {
 const getEmbeddingsConfig = () => {
   return new GoogleGenerativeAIEmbeddings({
     apiKey: process.env.GOOGLE_API_KEY,
-    modelName: "embedding-001", // This outputs 768 dimensions
+    modelName: "text-embedding-004",
+    maxRetries: 2,
   });
 };
-
 export const embedAndStore = async (text, namespace) => {
   try {
     const index = getPineconeIndex();

@@ -19,15 +19,21 @@ export const uploadDocument = async (req, res) => {
       return res.status(400).json({ message: "Only PDF files are supported" });
     }
 
+    console.log(`Processing file: ${req.file.originalname}`);
+
     // 2. Extract Text from PDF Buffer
-    // With pdf-parse-fork, it's a direct, standard ESM import.
-    const data = await pdf(req.file.buffer);
-    console.log("PDF Data Object:", data);
-    console.log(
-      "Raw Extracted Text Length:",
-      data.text ? data.text.length : "NULL",
-    );
-    const extractedText = data.text;
+    // FIX: Some environments require accessing .default when using ESM with this library
+    const pdfParser = pdf.default || pdf;
+
+    let data;
+    try {
+      data = await pdfParser(req.file.buffer);
+    } catch (parseError) {
+      console.error("PDF Parsing Error:", parseError);
+      return res.status(422).json({ message: "Could not read PDF content." });
+    }
+
+    const extractedText = data?.text;
 
     if (!extractedText || extractedText.trim().length < 10) {
       return res.status(400).json({
@@ -36,12 +42,16 @@ export const uploadDocument = async (req, res) => {
     }
 
     // 3. Generate Unique Namespace for Vector Isolation
-    const namespace = `${Date.now()}-${req.file.originalname.replace(/\s+/g, "_")}`;
+    // Clean filename to prevent Pinecone metadata issues
+    const safeName = req.file.originalname
+      .replace(/[^a-z0-9]/gi, "_")
+      .toLowerCase();
+    const namespace = `${Date.now()}-${safeName}`;
 
     // 4. Save Metadata to MongoDB
-    // Using a placeholder User ID until Auth Middleware is implemented
+    // Placeholder User ID remains until Auth is added
     const newDoc = await Document.create({
-      user: "65f1a2b3c4d5e6f7a8b9c0d1", // Dummy ID for now
+      user: "65f1a2b3c4d5e6f7a8b9c0d1",
       fileName: req.file.originalname,
       pineconeNamespace: namespace,
     });
@@ -49,7 +59,7 @@ export const uploadDocument = async (req, res) => {
     createdDocId = newDoc._id;
 
     // 5. Trigger RAG Pipeline: Chunking + Embedding + Pinecone Upload
-    console.log(`Starting AI indexing for: ${req.file.originalname}`);
+    console.log(`Starting Gemini indexing for namespace: ${namespace}`);
 
     // Pass extracted text and the namespace to our helper
     await embedAndStore(extractedText, namespace);
@@ -61,27 +71,29 @@ export const uploadDocument = async (req, res) => {
       preview: extractedText.substring(0, 150).replace(/\n/g, " ") + "...",
     });
   } catch (error) {
-    console.error("Critical Upload Error:", error);
+    // The "Detailed Error" log is your best friend on Render
+    console.error("CRITICAL UPLOAD ERROR:", error);
 
-    // ROLLBACK: If MongoDB saved but Pinecone/Embedding failed, delete the record
+    // ROLLBACK: If MongoDB saved but AI indexing failed, delete the record
     if (createdDocId) {
       try {
         await Document.findByIdAndDelete(createdDocId);
-        console.log(
-          "Rollback: Deleted MongoDB record due to AI indexing failure.",
-        );
+        console.log("Rollback: Deleted MongoDB record due to AI failure.");
       } catch (dbError) {
         console.error("Rollback failed:", dbError);
       }
     }
 
     res.status(500).json({
-      message: "Processing failed.",
-      error: error.message,
+      message: "Server processing failed.",
+      error: error.message, // This helps you see the actual crash reason in the network tab
     });
   }
 };
 
+/**
+ * Deletes a document from both MongoDB and Pinecone.
+ */
 export const deleteDocument = async (req, res) => {
   try {
     const { id } = req.params;
@@ -91,20 +103,26 @@ export const deleteDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // Try deleting from Pinecone first
+    console.log(
+      `Deleting document and namespace: ${document.pineconeNamespace}`,
+    );
+
+    // Delete from Pinecone
     await deleteNamespace(document.pineconeNamespace);
 
-    // Then delete from Mongo
+    // Delete from Mongo
     await Document.findByIdAndDelete(id);
 
     res.status(200).json({ message: "Deleted successfully" });
   } catch (error) {
-    // This log in your terminal is the key to fixing this!
-    console.error("DETAILED ERROR:", error);
+    console.error("DETAILED DELETE ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
+/**
+ * Fetches all documents for the user.
+ */
 export const getAllDocuments = async (req, res) => {
   try {
     const documents = await Document.find().sort({ createdAt: -1 });
