@@ -38,11 +38,13 @@ export const chatWithDocument = async (req, res) => {
 export const getChatHistory = async (req, res) => {
   try {
     const { docId } = req.params;
+    console.log(`🔍 Fetching history for docId: ${docId}`);
     const history = await Message.find({ documentId: docId }).sort({
       createdAt: 1,
     });
     res.status(200).json(history);
   } catch (error) {
+    console.error("❌ History Error:", error.message);
     res.status(500).json({ message: `Error fetching history` });
   }
 };
