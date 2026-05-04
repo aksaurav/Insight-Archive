@@ -43,6 +43,10 @@ app.use(express.json());
 // Routes
 app.use("/api/docs", docRoutes);
 app.use("/api/chat", chatRoutes);
+app.use((req, res) => {
+  console.log(`🕵️ 404 Attempted on: ${req.method} ${req.url}`);
+  res.status(404).send("Route not found on server");
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

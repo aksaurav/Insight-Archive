@@ -21,8 +21,12 @@ export const deleteDoc = (docId) => {
 };
 
 export const fetchChatHistory = (docId) => {
-  const cleanId = docId.trim();
-  return API.get(`/chat/history/${cleanId}`);
-};
+  if (!docId) return Promise.reject("No Document ID provided");
 
+  // Explicitly defining the path as an array-like join or manual string
+  const url = "/chat/history/" + docId.trim();
+  console.log("🛠️ Requesting URL:", url); // This will show in your browser console
+
+  return API.get(url);
+};
 export const fetchDocuments = () => API.get("/docs");
