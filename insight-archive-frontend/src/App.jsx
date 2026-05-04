@@ -47,26 +47,40 @@ function App() {
     }
   };
 
-  // --- NEW: Handle Selecting a Document & Loading History ---
+  // --- FIXED: Handle Selecting a Document & Loading History ---
   const handleSelectDocument = async (doc) => {
+    if (!doc || !doc._id) {
+      console.error("Invalid document selected");
+      return;
+    }
+
     setDocData(doc);
     setChat([]); // Clear UI state immediately
     setIsLoadingHistory(true);
+
     try {
-      const res = await fetchChatHistory(doc._id);
-      // If history exists in DB, use it; otherwise show a welcome message
-      if (res.data.length > 0) {
+      // Ensure we pass a clean string ID
+      const docId = String(doc._id).trim();
+      const res = await fetchChatHistory(docId);
+
+      if (res.data && res.data.length > 0) {
         setChat(res.data);
       } else {
         setChat([
           {
-            role: "system",
+            role: "ai", // Changed to 'ai' to match your UI icons
             content: `No previous history for "${doc.fileName}". Ask your first question!`,
           },
         ]);
       }
     } catch (err) {
-      console.error("Error loading chat history");
+      console.error("Error loading chat history:", err);
+      setChat([
+        {
+          role: "ai",
+          content: "Could not load history. You can still ask new questions.",
+        },
+      ]);
     } finally {
       setIsLoadingHistory(false);
     }
@@ -95,12 +109,12 @@ function App() {
 
     const userMsg = { role: "user", content: question };
     setChat((prev) => [...prev, userMsg]);
+    const currentQuestion = question;
     setQuestion("");
     setIsQuerying(true);
 
     try {
-      const res = await askQuestion(question, docData._id);
-      // Since the backend now saves messages, we just update the local UI state
+      const res = await askQuestion(currentQuestion, docData._id);
       setChat((prev) => [...prev, { role: "ai", content: res.data.answer }]);
     } catch (err) {
       setChat((prev) => [
@@ -160,7 +174,7 @@ function App() {
             {documents.map((doc) => (
               <div
                 key={doc._id}
-                onClick={() => handleSelectDocument(doc)} // UPDATED: Calls history loader
+                onClick={() => handleSelectDocument(doc)}
                 className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${
                   docData?._id === doc._id
                     ? "bg-blue-600/20 border-blue-500/50 text-blue-100 shadow-lg shadow-blue-900/20"

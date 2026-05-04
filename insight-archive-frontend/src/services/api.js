@@ -20,13 +20,10 @@ export const deleteDoc = (docId) => {
   return API.delete(`/docs/${docId}`);
 };
 
+// Force a hardcoded path structure in api.js
 export const fetchChatHistory = (docId) => {
-  if (!docId) return Promise.reject("No Document ID provided");
-
-  // Explicitly defining the path as an array-like join or manual string
-  const url = "/chat/history/" + docId.trim();
-  console.log("🛠️ Requesting URL:", url); // This will show in your browser console
-
+  const url = `/chat/history/${docId}`;
+  console.log("🚀 SENDING REQUEST TO:", url);
   return API.get(url);
 };
 export const fetchDocuments = () => API.get("/docs");
