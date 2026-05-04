@@ -20,6 +20,9 @@ export const deleteDoc = (docId) => {
   return API.delete(`/docs/${docId}`);
 };
 
-export const fetchChatHistory = (docId) => API.get(`/chat/history/${docId}`);
+export const fetchChatHistory = (docId) => {
+  const cleanId = docId.trim();
+  return API.get(`/chat/history/${cleanId}`);
+};
 
 export const fetchDocuments = () => API.get("/docs");

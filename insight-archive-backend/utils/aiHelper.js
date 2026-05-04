@@ -134,15 +134,30 @@ ${question}`;
 };
 
 // ==========================
-// 🗑 DELETE
+// 🗑 DELETE (Updated Version)
 // ==========================
 export const deleteNamespace = async (namespace) => {
   try {
     const index = getPineconeIndex();
-    await index.namespace(namespace).deleteAll();
+
+    // Using deleteMany with deleteAll: true is the recommended way
+    // to wipe a namespace in newer Pinecone SDK versions
+    await index.deleteMany({
+      deleteAll: true,
+      namespace: namespace,
+    });
+
     console.log(`🗑 Deleted namespace: ${namespace}`);
     return true;
   } catch (error) {
+    // If it's a 404, it might mean the namespace didn't exist yet,
+    // which we can treat as a success for a "delete" operation.
+    if (error.message.includes("404")) {
+      console.warn(
+        `⚠️ Namespace ${namespace} not found in Pinecone, skipping...`,
+      );
+      return true;
+    }
     console.error("❌ DELETE ERROR:", error.message);
     throw new Error(`Failed to delete vectors: ${error.message}`);
   }
