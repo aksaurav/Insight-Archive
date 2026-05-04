@@ -1,7 +1,7 @@
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { PineconeStore } from "@langchain/pinecone";
 import { Pinecone } from "@pinecone-database/pinecone";
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { CohereEmbeddings } from "@langchain/cohere"; // Changed from OpenAI
 import { ChatGroq } from "@langchain/groq";
 
 // ==========================
@@ -10,7 +10,7 @@ import { ChatGroq } from "@langchain/groq";
 const validateEnv = () => {
   const keys = [
     "GROQ_API_KEY",
-    "OPENAI_API_KEY",
+    "COHERE_API_KEY", // Changed from OPENAI_API_KEY
     "PINECONE_API_KEY",
     "PINECONE_INDEX_NAME",
   ];
@@ -27,11 +27,12 @@ const validateEnv = () => {
 // ✅ CONFIGURATION HELPERS
 // ==========================
 const getEmbeddings = () => {
-  return new OpenAIEmbeddings({
-    openAIApiKey: process.env.OPENAI_API_KEY,
-    // Note: This model produces 1536 dimensions.
-    // Ensure your Pinecone index is set to 1536.
-    modelName: "text-embedding-3-small",
+  return new CohereEmbeddings({
+    apiKey: process.env.COHERE_API_KEY,
+    // Note: This model produces 1024 dimensions.
+    // IMPORTANT: You MUST update your Pinecone index dimensions to 1024.
+    model: "embed-english-v3.0",
+    inputType: "search_document",
   });
 };
 
@@ -87,15 +88,20 @@ export const queryDocument = async (question, namespace) => {
   try {
     validateEnv();
     const index = getPineconeIndex();
-    const embeddings = getEmbeddings();
 
-    const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
+    // For queries, we use a specific inputType for better retrieval accuracy
+    const queryEmbeddings = new CohereEmbeddings({
+      apiKey: process.env.COHERE_API_KEY,
+      model: "embed-english-v3.0",
+      inputType: "search_query",
+    });
+
+    const vectorStore = await PineconeStore.fromExistingIndex(queryEmbeddings, {
       pineconeIndex: index,
       namespace,
       textKey: "text",
     });
 
-    // Retrieve top 4 most relevant chunks
     const results = await vectorStore.similaritySearch(question, 4);
 
     if (!results || results.length === 0) {
@@ -104,7 +110,6 @@ export const queryDocument = async (question, namespace) => {
 
     const context = results.map((r) => r.pageContent).join("\n\n");
 
-    // Initialize Groq for lightning-fast inference
     const model = new ChatGroq({
       apiKey: process.env.GROQ_API_KEY,
       model: "llama-3.3-70b-versatile",

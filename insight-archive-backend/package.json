@@ -14,6 +14,7 @@
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@langchain/cohere": "^1.0.5",
     "@langchain/core": "^1.1.42",
     "@langchain/google-genai": "^2.1.29",
     "@langchain/groq": "^1.2.0",
