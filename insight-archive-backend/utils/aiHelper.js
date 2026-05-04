@@ -1,17 +1,19 @@
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { PineconeStore } from "@langchain/pinecone";
 import { Pinecone } from "@pinecone-database/pinecone";
-import {
-  GoogleGenerativeAIEmbeddings,
-  ChatGoogleGenerativeAI,
-} from "@langchain/google-genai";
-import { TaskType } from "@google/generative-ai";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { ChatGroq } from "@langchain/groq";
 
 // ==========================
 // ✅ ENV VALIDATION
 // ==========================
 const validateEnv = () => {
-  const keys = ["GOOGLE_API_KEY", "PINECONE_API_KEY", "PINECONE_INDEX_NAME"];
+  const keys = [
+    "GROQ_API_KEY",
+    "OPENAI_API_KEY",
+    "PINECONE_API_KEY",
+    "PINECONE_INDEX_NAME",
+  ];
   keys.forEach((key) => {
     if (!process.env[key]) {
       throw new Error(
@@ -25,14 +27,14 @@ const validateEnv = () => {
 // ✅ CONFIGURATION HELPERS
 // ==========================
 const getEmbeddings = () => {
-  return new GoogleGenerativeAIEmbeddings({
-    apiKey: process.env.GOOGLE_API_KEY,
-    // Note: Do NOT use the "models/" prefix here.
-    // The library adds it automatically behind the scenes.
-    modelName: "text-embedding-004",
-    taskType: "RETRIEVAL_DOCUMENT",
+  return new OpenAIEmbeddings({
+    openAIApiKey: process.env.OPENAI_API_KEY,
+    // Note: This model produces 1536 dimensions.
+    // Ensure your Pinecone index is set to 1536.
+    modelName: "text-embedding-3-small",
   });
 };
+
 const getPineconeIndex = () => {
   const pc = new Pinecone({
     apiKey: process.env.PINECONE_API_KEY,
@@ -53,22 +55,12 @@ export const embedAndStore = async (text, namespace) => {
       throw new Error("No text content found to index.");
     }
 
-    // Dynamic dimension detection to prevent index mismatches
-    const testEmbedding = await embeddings.embedQuery("health check");
-    console.log(
-      `🧪 Verified: Model returning ${testEmbedding.length} dimensions.`,
-    );
-
     const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 800,
+      chunkSize: 1000,
       chunkOverlap: 100,
     });
 
     const docs = await splitter.createDocuments([text]);
-
-    if (!docs || docs.length === 0) {
-      throw new Error("Text splitting failed.");
-    }
 
     console.log(
       `📡 Sending ${docs.length} chunks to Pinecone (Namespace: ${namespace})`,
@@ -89,7 +81,7 @@ export const embedAndStore = async (text, namespace) => {
 };
 
 // ==========================
-// 🔍 QUERY
+// 🔍 QUERY (Powered by Groq)
 // ==========================
 export const queryDocument = async (question, namespace) => {
   try {
@@ -103,6 +95,7 @@ export const queryDocument = async (question, namespace) => {
       textKey: "text",
     });
 
+    // Retrieve top 4 most relevant chunks
     const results = await vectorStore.similaritySearch(question, 4);
 
     if (!results || results.length === 0) {
@@ -111,13 +104,14 @@ export const queryDocument = async (question, namespace) => {
 
     const context = results.map((r) => r.pageContent).join("\n\n");
 
-    const model = new ChatGoogleGenerativeAI({
-      modelName: "gemini-1.5-flash",
-      apiKey: process.env.GOOGLE_API_KEY,
-      temperature: 0.3,
+    // Initialize Groq for lightning-fast inference
+    const model = new ChatGroq({
+      apiKey: process.env.GROQ_API_KEY,
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.2,
     });
 
-    const prompt = `You are a helpful AI assistant. Use the provided context to answer the question accurately.
+    const prompt = `You are a professional AI assistant. Use the provided context to answer the question accurately. 
 If the answer isn't in the context, politely state that the information is not available.
 
 CONTEXT:
