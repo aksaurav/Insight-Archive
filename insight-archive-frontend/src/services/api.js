@@ -1,7 +1,8 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  baseURL:
+    import.meta.env.VITE_API_URL || "https://insight-archive.onrender.com/api",
 });
 
 export const uploadFile = (file) => {
@@ -20,10 +21,12 @@ export const deleteDoc = (docId) => {
   return API.delete(`/docs/${docId}`);
 };
 
-// Force a hardcoded path structure in api.js
 export const fetchChatHistory = (docId) => {
-  const url = `/chat/history/${docId}`;
-  console.log("🚀 SENDING REQUEST TO:", url);
-  return API.get(url);
+  const cleanId = String(docId).trim();
+  // Using a comma in console.log to see the value clearly in the browser
+  console.log("📡 API Call - ID:", cleanId);
+
+  // Hard-coded leading slash for the ID
+  return API.get(`/chat/history/` + cleanId);
 };
 export const fetchDocuments = () => API.get("/docs");
