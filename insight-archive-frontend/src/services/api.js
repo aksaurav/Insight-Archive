@@ -13,8 +13,12 @@ export const uploadFile = (file) => {
   });
 };
 
-export const askQuestion = (question, namespace) => {
-  return API.post("/chat/query", { question, namespace });
+// --- FIXED: Changed payload key from 'namespace' to 'documentId' ---
+export const askQuestion = (question, documentId) => {
+  return API.post("/chat/query", { 
+    question, 
+    documentId 
+  });
 };
 
 export const deleteDoc = (docId) => {
@@ -23,10 +27,8 @@ export const deleteDoc = (docId) => {
 
 export const fetchChatHistory = (docId) => {
   const cleanId = String(docId).trim();
-  // Using a comma in console.log to see the value clearly in the browser
   console.log("📡 API Call - ID:", cleanId);
-
-  // Hard-coded leading slash for the ID
   return API.get(`/chat/history/` + cleanId);
 };
+
 export const fetchDocuments = () => API.get("/docs");
