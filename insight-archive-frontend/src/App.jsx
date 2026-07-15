@@ -29,6 +29,7 @@ function App() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const chatEndRef = useRef(null);
+  const fileInputRef = useRef(null); // Ref to clear the HTML file input element safely
 
   useEffect(() => {
     loadLibrary();
@@ -43,11 +44,11 @@ function App() {
       const res = await fetchDocuments();
       setDocuments(res.data);
     } catch (err) {
-      console.error("Failed to load document library");
+      console.error("Failed to load document library:", err.response?.data || err.message);
     }
   };
 
-  // --- FIXED: Handle Selecting a Document & Loading History ---
+  // Handle Selecting a Document & Loading History
   const handleSelectDocument = async (doc) => {
     if (!doc || !doc._id) {
       console.error("Invalid document selected");
@@ -59,7 +60,6 @@ function App() {
     setIsLoadingHistory(true);
 
     try {
-      // Ensure we pass a clean string ID
       const docId = String(doc._id).trim();
       const res = await fetchChatHistory(docId);
 
@@ -68,13 +68,13 @@ function App() {
       } else {
         setChat([
           {
-            role: "ai", // Changed to 'ai' to match your UI icons
+            role: "ai",
             content: `No previous history for "${doc.fileName}". Ask your first question!`,
           },
         ]);
       }
     } catch (err) {
-      console.error("Error loading chat history:", err);
+      console.error("Error loading chat history:", err.response?.data || err.message);
       setChat([
         {
           role: "ai",
@@ -87,16 +87,23 @@ function App() {
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || isUploading) return;
     setIsUploading(true);
     try {
       const res = await uploadFile(file);
       const newDoc = res.data.document;
+      
+      // Safely reset file state and DOM input element
       setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""; 
+      }
+
       await loadLibrary();
       // Automatically select the new document
       handleSelectDocument(newDoc);
     } catch (err) {
+      console.error("Error uploading file details:", err.response?.data || err.message);
       alert("Error uploading file.");
     } finally {
       setIsUploading(false);
@@ -117,6 +124,8 @@ function App() {
       const res = await askQuestion(currentQuestion, docData._id);
       setChat((prev) => [...prev, { role: "ai", content: res.data.answer }]);
     } catch (err) {
+      // Log full server response error detail to target the 400 Bad Request
+      console.error("Query failed details:", err.response?.data || err.message);
       setChat((prev) => [
         ...prev,
         { role: "ai", content: "Error processing request." },
@@ -139,6 +148,7 @@ function App() {
       }
       loadLibrary();
     } catch (err) {
+      console.error("Delete failed details:", err.response?.data || err.message);
       alert("Delete failed.");
     }
   };
@@ -225,6 +235,7 @@ function App() {
               <input
                 type="file"
                 id="file-upload"
+                ref={fileInputRef} // Assigned ref here to clear native input
                 onChange={(e) => setFile(e.target.files[0])}
                 className="hidden"
                 accept=".pdf"
@@ -290,7 +301,7 @@ function App() {
                     className={`flex gap-4 max-w-[80%] ${msg.role === "user" ? "flex-row-reverse" : ""}`}
                   >
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                      className={`flex w-10 h-10 rounded-xl items-center justify-center shrink-0 border ${
                         msg.role === "user"
                           ? "bg-blue-600 border-blue-400/30"
                           : "bg-slate-800 border-slate-700"
