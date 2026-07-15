@@ -29,7 +29,7 @@ function App() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const chatEndRef = useRef(null);
-  const fileInputRef = useRef(null); // Ref to clear the HTML file input element safely
+  const fileInputRef = useRef(null); // Ref to safely reset the native HTML file input element
 
   useEffect(() => {
     loadLibrary();
@@ -56,7 +56,7 @@ function App() {
     }
 
     setDocData(doc);
-    setChat([]); // Clear UI state immediately
+    setChat([]); // Clear UI state immediately to prevent flicker
     setIsLoadingHistory(true);
 
     try {
@@ -93,14 +93,16 @@ function App() {
       const res = await uploadFile(file);
       const newDoc = res.data.document;
       
-      // Safely reset file state and DOM input element
+      // Reset local file state
       setFile(null);
+      
+      // Reset actual DOM input element value so the same file can be re-selected if needed
       if (fileInputRef.current) {
         fileInputRef.current.value = ""; 
       }
 
       await loadLibrary();
-      // Automatically select the new document
+      // Automatically select the new document and start context
       handleSelectDocument(newDoc);
     } catch (err) {
       console.error("Error uploading file details:", err.response?.data || err.message);
@@ -112,7 +114,8 @@ function App() {
 
   const handleQuery = async (e) => {
     e.preventDefault();
-    if (!question.trim() || !docData || isQuerying) return;
+    // Guard clause to prevent empty questions or requests while querying/loading
+    if (!question.trim() || !docData || isQuerying || isLoadingHistory) return;
 
     const userMsg = { role: "user", content: question };
     setChat((prev) => [...prev, userMsg]);
@@ -121,10 +124,10 @@ function App() {
     setIsQuerying(true);
 
     try {
+      // Passing both currentQuestion and document ID (_id matches documentId)
       const res = await askQuestion(currentQuestion, docData._id);
       setChat((prev) => [...prev, { role: "ai", content: res.data.answer }]);
     } catch (err) {
-      // Log full server response error detail to target the 400 Bad Request
       console.error("Query failed details:", err.response?.data || err.message);
       setChat((prev) => [
         ...prev,
@@ -235,7 +238,7 @@ function App() {
               <input
                 type="file"
                 id="file-upload"
-                ref={fileInputRef} // Assigned ref here to clear native input
+                ref={fileInputRef} // Assigned the ref to clear value programmatically
                 onChange={(e) => setFile(e.target.files[0])}
                 className="hidden"
                 accept=".pdf"
