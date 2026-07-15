@@ -13,11 +13,11 @@ export const uploadFile = (file) => {
   });
 };
 
-// --- FIXED: Changed payload key from 'namespace' to 'documentId' ---
-export const askQuestion = (question, documentId) => {
+// --- FIXED: Changed 'documentId' parameter and key name to match your backend destructuring ('docId') ---
+export const askQuestion = (question, docId) => {
   return API.post("/chat/query", { 
     question, 
-    documentId 
+    docId 
   });
 };
 
